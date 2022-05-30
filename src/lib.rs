@@ -6,6 +6,10 @@ near_sdk::setup_alloc!();
 
 // 1. Main Struct
 
+pub fn Hospitals {
+
+}
+
 // 2. Default Implementation
 
 // 3. Core Logic
