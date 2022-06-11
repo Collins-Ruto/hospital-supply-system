@@ -54,11 +54,6 @@ pub struct Supplier {
     supply_worth: f32,
 }
 
-// enum Result {
-//     Ok(Promise),
-//     Err(String),
-// }
-
 #[near_bindgen]
 impl Supplies {
     #[payable]
@@ -71,7 +66,7 @@ impl Supplies {
     #[private]
     pub fn add_hospital(&mut self, name: String, level: String, county: String) {
         let new_hospital = Hospitals {
-            hospital_name: name,
+            hospital_name: name.clone(),
             hospital_level: level,
             hospital_county: county,
             supplies: HashMap::new(),
@@ -156,7 +151,7 @@ impl Supplies {
             }
             return "successful".to_string();
         } else {
-            log!("inexistent id")
+            return "inexistent id".to_string();
         }
     }
 
@@ -185,10 +180,10 @@ impl Supplies {
         let token: U128 = U128::from(charge as u128);
         log!("token conv: {:?}", token);
 
-        let supply_struct = self.data[&id];
+        let supply_struct = &self.data[&id];
 
-        let supplier_id: AccountId = (supply_struct.supplier.name).try_into().unwrap();
-        let acc: AccountId = (supply_struct.sponsor).try_into().unwrap();
+        let supplier_id: AccountId = (supply_struct.supplier.name.clone()).try_into().unwrap();
+        let acc: AccountId = (supply_struct.sponsor.clone()).try_into().unwrap();
         let sponsor_deposit = U128::from(self.funds[&acc] as u128);
 
         assert!(self.funds.contains_key(&acc), "Check your sponsor and try again");
@@ -198,6 +193,12 @@ impl Supplies {
 
         log!("Successfull");
         Promise::new(supplier_id).transfer(token.0)
+    }
+
+    pub fn view_deposits(&self) {
+        for i in &self.funds {
+            log!("{:#?}", i)
+        }
     }
 }
 
