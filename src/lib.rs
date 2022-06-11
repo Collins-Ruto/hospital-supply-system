@@ -54,6 +54,11 @@ pub struct Supplier {
     supply_worth: f32,
 }
 
+// enum Result {
+//     Ok(Promise),
+//     Err(String),
+// }
+
 #[near_bindgen]
 impl Supplies {
     #[payable]
@@ -175,7 +180,25 @@ impl Supplies {
         log!("The public will judge your miscellaneous costs")
     }
 
-    
+    pub fn request_funds(&mut self, id: String) -> Promise {
+        let charge = self.data[&id].supply_cost + self.data[&id].misc_cost;
+        let token: U128 = U128::from(charge as u128);
+        log!("token conv: {:?}", token);
+
+        let supply_struct = self.data[&id];
+
+        let supplier_id: AccountId = (supply_struct.supplier.name).try_into().unwrap();
+        let acc: AccountId = (supply_struct.sponsor).try_into().unwrap();
+        let sponsor_deposit = U128::from(self.funds[&acc] as u128);
+
+        assert!(self.funds.contains_key(&acc), "Check your sponsor and try again");
+        assert!(token < sponsor_deposit, "Sponsors Deposit is Low");
+        assert!(self.suppliers.contains_key(&supply_struct.supplier.name), "Your account is not known");
+        assert!(self.hospitals.contains_key(&supply_struct.hospital.hospital_name), "The target hospital is unknown");
+
+        log!("Successfull");
+        Promise::new(supplier_id).transfer(token.0)
+    }
 }
 
 impl Hospitals {
@@ -203,8 +226,3 @@ impl Supplier {
 fn to_near(yocto: u128) -> f32 {
     (yocto as f32) / 1_000_000_000_000_000_000_000_000.0
 }
-// 2. Default Implementation
-
-// 3. Core Logic
-
-// 4. Testsn
