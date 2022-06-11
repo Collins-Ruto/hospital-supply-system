@@ -140,16 +140,17 @@ impl Supplies {
     }
 
     pub fn add_supplies(&mut self, id: String, supplies: String, costs: String) -> String {
-        let supplies_vec: Vec<&str> = supplies.split(", ").collect();
+        let supplies_vec: Vec<&str> = supplies.split(", ").collect(); // 
         let supplies_cost: Vec<&str> = costs.split(", ").collect();
         let mut costs_vec: Vec<f32> = vec![];
-        for s in &supplies_cost {
+        for s in &supplies_cost { // convert the str costs to float and add them to a Vec
             costs_vec.push(s.parse().unwrap())
         }
         let supply_cost: f32 = costs_vec.iter().sum();
         if self.data.contains_key(&id) {
             for supply in supplies_vec.clone() {
-                if !self.items.contains_key(&supply.to_string()) {
+                log!("supplies are {}", supply);
+                if !self.items.contains_key(&supply.to_string()) { // check if the supply exists in our list of acceptable items
                     return "unsucessful".to_string();
                 };
                 let index = supplies_vec.iter().position(|&r| r == supply).unwrap();
@@ -318,15 +319,34 @@ mod tests {
     }
 
     #[test]
+    fn test_add_supply() {
+        let mut contract: Supplies = Supplies::default();
+        contract.add_item(st("scapel"), 55.5, st("mrm"), st("sugical"), st("11-2-2002"));
+        contract.add_item(st("gauze"), 200.0, st("trex"), st("sugical"), st("11-2-2002"));
+
+        assert_eq!(2, contract.items.len());
+    }
+
+    #[test]
     fn test_new_supplies() {
         let context = get_context(kemsa(), 0);
         testing_env!(context);
         let mut contract: Supplies = Supplies::default();
-
+    
         contract.add_supplier(st("public"));
         contract.add_hospital(coast_gen().to_string(),"subcounty".to_string(), "mombasa".to_string());
         contract.new_supply(health_ministry() , coast_gen().to_string());
+        contract.add_item(st("scapel"), 55.5, st("mrm"), st("sugical"), st("11-2-2002"));
+        contract.add_item(st("gauze"), 200.0, st("trex"), st("sugical"), st("11-2-2002"));
         
+        // Add data with real supplier, hospital and sponsor
+        contract.add_supplies("2".to_string(),"scapel, gauze".to_string(), "0, 0".to_string());
+        assert_eq!(2, contract.data["2"].supplies.len());
+
+        // Test no data should be added without a valid id
         contract.add_supplies("1".to_string(),"scapel, gauze".to_string(), "2.3, 3.4".to_string());
+        assert_eq!(2, contract.data["2"].supplies.len());
     }
+
+
 }
