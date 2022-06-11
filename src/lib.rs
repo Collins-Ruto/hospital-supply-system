@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 
 #[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize)]
+#[derive( BorshDeserialize, BorshSerialize)]
 pub struct Supplies {
     data: HashMap<String, Supply>,
     hospitals: HashMap<String, Hospitals>,
@@ -22,7 +22,6 @@ pub struct Supply {
     supplies: HashMap<String, f32>,
     sponsor: String,
     supply_cost: f32,
-    fund: f32,
     misc: HashMap<String, f32>,
     misc_cost: f32,
 }
@@ -52,6 +51,19 @@ pub struct Supplier {
     types: String,
     supply_runs: u32,
     supply_worth: f32,
+}
+
+impl Default for Supplies {
+    fn default() -> Self {
+        Self {
+            data: HashMap::new(),
+            hospitals: HashMap::new(),
+            suppliers: HashMap::new(),
+            items: HashMap::new(),
+            ids: 1,
+            funds: HashMap::new(),
+        }
+    }
 }
 
 #[near_bindgen]
@@ -104,17 +116,16 @@ impl Supplies {
         self.suppliers.insert(name, new_supplier);
     }
 
-    pub fn new_supply(&mut self, sponsor: AccountId, hospital: String, fund: f32) -> String {
+    pub fn new_supply(&mut self, sponsor: AccountId, hospital_id: String) -> String {
         let id = (self.ids + 1).to_string();
         let supplier_acc_id = env::predecessor_account_id().to_string();
-        let hospital_name = self.hospitals[&hospital].clone();
+        let hospital = self.hospitals[&hospital_id].clone();
         let supplier = self.suppliers[&supplier_acc_id].clone();
         let new_supply = Supply {
-            hospital: hospital_name,
+            hospital: hospital,
             supplier: supplier,
             supplies: HashMap::new(),
             sponsor: sponsor.to_string(),
-            fund: fund,
             supply_cost: 0.0,
             misc: HashMap::new(),
             misc_cost: 0.0,
@@ -124,6 +135,7 @@ impl Supplies {
             "Note your supply id is {}, You'll need it to feed your supply data",
             id
         );
+        self.ids += 1;
         id.to_string()
     }
 
@@ -195,15 +207,17 @@ impl Supplies {
         Promise::new(supplier_id).transfer(token.0)
     }
 
-    pub fn view_deposits(&self) {
+    pub fn view_deposits(&self) -> usize {
+        log!("in View");
         for i in &self.funds {
             log!("{:#?}", i)
         }
+        self.funds.len()
     }
 }
 
 impl Hospitals {
-    pub fn clone(&self) -> Self {
+    fn clone(&self) -> Self {
         Self {
             hospital_name: self.hospital_name.clone(),
             hospital_county: self.hospital_county.clone(),
@@ -214,7 +228,7 @@ impl Hospitals {
 }
 
 impl Supplier {
-    pub fn clone(&self) -> Self {
+    fn clone(&self) -> Self {
         Self {
             name: self.name.clone(),
             types: self.types.clone(),
@@ -226,4 +240,93 @@ impl Supplier {
 
 fn to_near(yocto: u128) -> f32 {
     (yocto as f32) / 1_000_000_000_000_000_000_000_000.0
+}
+
+pub fn st(text: &str) -> String {
+    text.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use near_sdk::{testing_env, VMContext};
+    use std::convert::TryFrom;
+
+    fn coast_gen() -> AccountId {
+        AccountId::try_from("coast-general.testnet".to_string().clone()).unwrap()   
+    }
+    fn kemsa() -> AccountId {
+        AccountId::try_from("kemsa.testnet".to_string().clone()).unwrap()   
+    }
+    fn health_ministry() -> AccountId {
+        AccountId::try_from("moh.testnet".to_string().clone()).unwrap()   
+    }
+
+    fn get_context(predecessor_account_id: AccountId, attached_deposit: u128) -> VMContext {
+        VMContext {
+            current_account_id: AccountId::try_from("collinsrutto.testnet".to_string().clone()).unwrap(),
+            signer_account_id: AccountId::try_from("bob_near".to_string().to_string().clone()).unwrap(),
+            signer_account_pk: vec![0u8; 33].try_into().unwrap(),
+            predecessor_account_id,
+            input: vec![],
+            block_index: 0,
+            block_timestamp: 0,
+            account_balance: 0,
+            account_locked_balance: 0,
+            storage_usage: 0,
+            attached_deposit,
+            view_config: None,
+            prepaid_gas: near_sdk::Gas(10u64.pow(18)),
+            random_seed: [0u8; 32],
+            output_data_receivers: vec![],
+            epoch_height: 19,
+        }
+    }
+
+    #[test]
+    fn test_deposit() {
+        let deposit: u128 = 30000000000000000000000000; // attaching 3 NEAR
+        let context = get_context(health_ministry(), deposit);
+        testing_env!(context);
+        let mut contract: Supplies = Supplies::default();
+        contract.deposit();
+        assert_eq!(1, contract.view_deposits());
+    }
+
+    #[test]
+    fn test_new_hos() {
+        let context = get_context(coast_gen(), 0);
+        testing_env!(context);
+        let mut contract: Supplies = Supplies::default();
+        contract.add_hospital(coast_gen().to_string(), "subcounty".to_string(), "mombasa".to_string());
+        assert_eq!(1, contract.hospitals.len());
+        assert!(contract.hospitals.contains_key(&coast_gen().to_string()));
+    }
+
+    #[test]
+    fn test_new_supply() {
+        let context = get_context(kemsa(), 0);
+        testing_env!(context);
+        let mut contract: Supplies = Supplies::default();
+
+        contract.add_supplier(st("public"));
+        contract.add_hospital(coast_gen().to_string(),"subcounty".to_string(), "mombasa".to_string());
+        contract.new_supply(health_ministry() , coast_gen().to_string());
+        
+        assert!(contract.data.contains_key(&st("2")));
+        assert!(contract.data.len() > 0);
+    }
+
+    #[test]
+    fn test_new_supplies() {
+        let context = get_context(kemsa(), 0);
+        testing_env!(context);
+        let mut contract: Supplies = Supplies::default();
+
+        contract.add_supplier(st("public"));
+        contract.add_hospital(coast_gen().to_string(),"subcounty".to_string(), "mombasa".to_string());
+        contract.new_supply(health_ministry() , coast_gen().to_string());
+        
+        contract.add_supplies("1".to_string(),"scapel, gauze".to_string(), "2.3, 3.4".to_string());
+    }
 }
