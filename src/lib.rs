@@ -70,9 +70,9 @@ impl Default for Supplies {
 impl Supplies {
     #[payable]
     pub fn deposit(&mut self) {
-        let token = to_near(env::attached_deposit());
+        let token = env::attached_deposit();
         let funder = env::predecessor_account_id();
-        self.funds.insert(funder, token);
+        self.funds.insert(funder, token as f32);
     }
 
     #[private]
@@ -118,8 +118,10 @@ impl Supplies {
     pub fn new_supply(&mut self, sponsor: AccountId, hospital_id: String) -> String {
         let id = (self.ids + 1).to_string();
         let supplier_acc_id = env::predecessor_account_id().to_string();
+        
         let hospital = self.hospitals[&hospital_id].clone();
         let supplier = self.suppliers[&supplier_acc_id].clone();
+
         let new_supply = Supply {
             hospital: hospital,
             supplier: supplier,
@@ -197,16 +199,15 @@ impl Supplies {
     
     pub fn request_funds(&mut self, id: String) -> Promise {
         let charge = self.data[&id].supply_cost + self.data[&id].misc_cost;
-        let token: U128 = U128::from(charge as u128);
-        log!("token conv: {:?}", token);
+        let token: U128 = U128::from(charge as u128 * u128::pow(10, 24));
+        log!("Calculated costs: {:?}", token);
 
         let supply_struct = &self.data[&id];
 
-        let supplier_id: AccountId = (supply_struct.supplier.name.clone()).try_into().unwrap();
+        let supplier_id: AccountId = (supply_struct.supplier.name.clone()).parse().unwrap();
         let sponsor_acc: AccountId = (supply_struct.sponsor.clone()).try_into().unwrap();
         let sponsor_deposit = if self.funds.contains_key(&sponsor_acc) {U128::from(self.funds[&sponsor_acc] as u128)} else {U128::from(0)};
 
-        log!("cot 1");
         assert!(self.funds.contains_key(&sponsor_acc), "Check your sponsor and try again");
         assert!(token < sponsor_deposit, "Sponsors Deposit is Low");
         assert!(self.suppliers.contains_key(&supply_struct.supplier.name), "Your account is not known");
@@ -214,8 +215,9 @@ impl Supplies {
 
         log!("Successfull");
         if let Some(fund) = self.funds.get_mut(&sponsor_acc) {
-            *fund -= charge;
+            *fund -= charge * (u128::pow(10, 24)) as f32;
         }
+        log!("supplier id: {}", supplier_id);
         Promise::new(supplier_id).transfer(token.0)
     }
 
@@ -243,7 +245,7 @@ impl Supplier {
     }
 }
 
-fn to_near(yocto: u128) -> f32 {
+pub fn to_near(yocto: u128) -> f32 {
     (yocto as f32) / 1_000_000_000_000_000_000_000_000.0
 }
 
@@ -313,16 +315,16 @@ mod tests {
         testing_env!(context);
         let mut contract: Supplies = Supplies::default();
 
-        contract.add_supplier(st("kemsa.collinsrutto.testnet"), st("public"));
+        contract.add_supplier(st("kemsa.testnet"), st("public"));
         contract.add_hospital(coast_gen().to_string(),"subcounty".to_string(), "mombasa".to_string());
-        contract.new_supply(health_ministry() , coast_gen().to_string());
+        contract.new_supply(health_ministry(), coast_gen().to_string());
         
         assert!(contract.data.contains_key(&st("2")));
         assert!(contract.data.len() > 0);
     }
 
     #[test]
-    fn test_add_supply() {
+    fn test_add_item() {
         let mut contract: Supplies = Supplies::default();
         contract.add_item(st("scapel"), 55.5, st("mrm"), st("sugical"), st("11-2-2002"));
         contract.add_item(st("gauze"), 200.0, st("trex"), st("sugical"), st("11-2-2002"));
@@ -336,7 +338,7 @@ mod tests {
         testing_env!(context);
         let mut contract: Supplies = Supplies::default();
        
-        contract.add_supplier(st("kemsa.collinsrutto.testnet"), st("public"));
+        contract.add_supplier(st("kemsa.testnet"), st("public"));
         contract.add_hospital(coast_gen().to_string(),"subcounty".to_string(), "mombasa".to_string());
         contract.new_supply(health_ministry() , coast_gen().to_string());
         contract.add_item(st("scapel"), 55.5, st("mrm"), st("sugical"), st("11-2-2002"));
@@ -361,12 +363,12 @@ mod tests {
         let mut contract: Supplies = Supplies::default();
 
         contract.deposit();
-        contract.add_supplier(st("kemsa.collinsrutto.testnet"), st("public"));
+        contract.add_supplier(st("kemsa.testnet"), st("public"));
         contract.add_hospital(coast_gen().to_string(),"subcounty".to_string(), "mombasa".to_string());
         contract.new_supply(health_ministry() , coast_gen().to_string());
         contract.add_item(st("scapel"), 55.5, st("mrm"), st("sugical"), st("11-2-2002"));
         contract.add_item(st("gauze"), 200.0, st("trex"), st("sugical"), st("11-2-2002"));
-    
+        
         // Add data with real supplier, hospital and sponsor
         contract.add_supplies("2".to_string(),"scapel, gauze".to_string(), "25.5, 225.0".to_string());
         contract.request_funds(st("2"));
