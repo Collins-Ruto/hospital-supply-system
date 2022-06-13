@@ -366,7 +366,7 @@ mod tests {
         contract.new_supply(health_ministry() , coast_gen().to_string());
         contract.add_item(st("scapel"), 55.5, st("mrm"), st("sugical"), st("11-2-2002"));
         contract.add_item(st("gauze"), 200.0, st("trex"), st("sugical"), st("11-2-2002"));
-        
+    
         // Add data with real supplier, hospital and sponsor
         contract.add_supplies("2".to_string(),"scapel, gauze".to_string(), "25.5, 225.0".to_string());
         contract.request_funds(st("2"));
